@@ -67,3 +67,8 @@ if (require.main === module) {
 }
 
 module.exports = app;
+
+// for testing purposes, serve the index.html file for the root route
+app.get('/', (req, res) => {
+  res.sendFile(__dirname + '/public/index.html');
+});
