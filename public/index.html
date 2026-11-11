@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Notes and Posts</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: system-ui, sans-serif;
+      color: #202938;
+      background: #f3f5f8;
+    }
+
+    body {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 24px 16px 48px;
+    }
+
+    h1, h2 {
+      margin-top: 0;
+    }
+
+    section {
+      margin: 16px 0;
+      padding: 20px;
+      border: 1px solid #dce1e8;
+      border-radius: 10px;
+      background: #fff;
+    }
+
+    form {
+      display: grid;
+      gap: 10px;
+      max-width: 560px;
+    }
+
+    input, textarea, button {
+      box-sizing: border-box;
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #bbc4d0;
+      border-radius: 6px;
+      font: inherit;
+    }
+
+    textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+
+    button {
+      width: auto;
+      border: 0;
+      background: #2457c5;
+      color: #fff;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #19449f;
+    }
+
+    #logout-button {
+      margin-top: 8px;
+      background: #5a6472;
+    }
+
+    .message {
+      min-height: 1.4em;
+      margin: 10px 0 0;
+      color: #485568;
+      overflow-wrap: anywhere;
+    }
+
+    .error {
+      color: #b42318;
+    }
+
+    .note {
+      margin-top: 10px;
+      padding: 12px;
+      border: 1px solid #e1e5eb;
+      border-radius: 6px;
+    }
+
+    .note h3 {
+      margin: 0 0 6px;
+    }
+
+    .note p {
+      margin: 0;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    pre {
+      padding: 12px;
+      border-radius: 6px;
+      background: #f3f5f8;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Notes and Posts</h1>
+    <p id="auth-status" class="message">You are not logged in.</p>
+    <button id="logout-button" type="button" hidden>Log out</button>
+  </header>
+
+  <main>
+    <section>
+      <h2>Login</h2>
+      <form id="login-form">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="username" required>
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+        <button type="submit">Log in</button>
+      </form>
+      <p id="login-message" class="message" aria-live="polite"></p>
+    </section>
+
+    <div id="authenticated-content" hidden>
+      <section>
+        <h2>My Notes</h2>
+        <form id="note-form">
+          <label for="note-title">Title</label>
+          <input id="note-title" name="title" maxlength="150" required>
+          <label for="note-content">Content</label>
+          <textarea id="note-content" name="content" required></textarea>
+          <button type="submit">Create note</button>
+        </form>
+        <p id="note-message" class="message" aria-live="polite"></p>
+        <div id="notes-list" aria-live="polite"></div>
+      </section>
+
+      <section>
+        <h2>Create a Post</h2>
+        <form id="post-form">
+          <label for="post-title">Title</label>
+          <input id="post-title" name="title" maxlength="150" required>
+          <label for="post-body">Body</label>
+          <textarea id="post-body" name="body" required></textarea>
+          <button type="submit">Create post</button>
+        </form>
+        <p id="post-message" class="message" aria-live="polite"></p>
+      </section>
+
+      <section>
+        <h2>Admin: Find a User's Posts</h2>
+        <form id="lookup-form">
+          <label for="user-id">User ID</label>
+          <input id="user-id" name="userId" required>
+          <button type="submit">Fetch user and posts</button>
+        </form>
+        <p id="lookup-message" class="message" aria-live="polite"></p>
+        <pre id="lookup-result" hidden></pre>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const TOKEN_KEY = 'token';
+    let token = localStorage.getItem(TOKEN_KEY) || '';
+
+    const authStatus = document.getElementById('auth-status');
+    const authenticatedContent = document.getElementById('authenticated-content');
+    const logoutButton = document.getElementById('logout-button');
+
+    function showMessage(element, message, isError = false) {
+      element.textContent = message;
+      element.classList.toggle('error', isError);
+    }
+
+    function updateAuthUI() {
+      const isLoggedIn = Boolean(token);
+      authStatus.textContent = isLoggedIn ? 'You are logged in.' : 'You are not logged in.';
+      authenticatedContent.hidden = !isLoggedIn;
+      logoutButton.hidden = !isLoggedIn;
+    }
+
+    async function apiRequest(path, options = {}) {
+      const headers = new Headers(options.headers || {});
+      if (options.body && !headers.has('Content-Type')) {
+        headers.set('Content-Type', 'application/json');
+      }
+      if (token) {
+        headers.set('Authorization', `Bearer ${token}`);
+      }
+
+      const response = await fetch(path, { ...options, headers });
+      const responseText = await response.text();
+      let result = {};
+      if (responseText) {
+        try {
+          result = JSON.parse(responseText);
+        } catch {
+          result = { message: responseText };
+        }
+      }
+
+      if (!response.ok) {
+        throw new Error(result.message || `Request failed (${response.status}).`);
+      }
+      return result;
+    }
+
+    function renderNotes(notes) {
+      const list = document.getElementById('notes-list');
+      list.replaceChildren();
+
+      if (!notes.length) {
+        const emptyMessage = document.createElement('p');
+        emptyMessage.textContent = 'No notes found.';
+        list.append(emptyMessage);
+        return;
+      }
+
+      for (const note of notes) {
+        const article = document.createElement('article');
+        article.className = 'note';
+
+        const title = document.createElement('h3');
+        title.textContent = note.title || 'Untitled';
+        const content = document.createElement('p');
+        content.textContent = note.content || '';
+
+        article.append(title, content);
+        list.append(article);
+      }
+    }
+
+    async function loadNotes() {
+      const message = document.getElementById('note-message');
+      showMessage(message, 'Loading notes...');
+      try {
+        const result = await apiRequest('/api/notes');
+        renderNotes(Array.isArray(result.data) ? result.data : []);
+        showMessage(message, '');
+      } catch (error) {
+        showMessage(message, error.message, true);
+      }
+    }
+
+    document.getElementById('login-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const message = document.getElementById('login-message');
+      showMessage(message, 'Logging in...');
+
+      const formData = new FormData(form);
+      try {
+        const result = await apiRequest('/api/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({
+            email: formData.get('email'),
+            password: formData.get('password'),
+          }),
+        });
+        if (!result.token) {
+          throw new Error('The login response did not contain a token.');
+        }
+
+        token = result.token;
+        localStorage.setItem(TOKEN_KEY, token);
+        updateAuthUI();
+        form.reset();
+        showMessage(message, 'Login successful.');
+        await loadNotes();
+      } catch (error) {
+        showMessage(message, error.message, true);
+      }
+    });
+
+    logoutButton.addEventListener('click', () => {
+      token = '';
+      localStorage.removeItem(TOKEN_KEY);
+      updateAuthUI();
+      renderNotes([]);
+      for (const id of ['note-message', 'post-message', 'lookup-message']) {
+        showMessage(document.getElementById(id), '');
+      }
+      document.getElementById('lookup-result').hidden = true;
+      showMessage(document.getElementById('login-message'), 'You have logged out.');
+    });
+
+    document.getElementById('note-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const message = document.getElementById('note-message');
+      const formData = new FormData(form);
+      showMessage(message, 'Creating note...');
+      try {
+        await apiRequest('/api/notes', {
+          method: 'POST',
+          body: JSON.stringify({
+            title: formData.get('title'),
+            content: formData.get('content'),
+          }),
+        });
+        form.reset();
+        showMessage(message, 'Note created.');
+        await loadNotes();
+      } catch (error) {
+        showMessage(message, error.message, true);
+      }
+    });
+
+    document.getElementById('post-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const message = document.getElementById('post-message');
+      const formData = new FormData(form);
+      showMessage(message, 'Creating post...');
+      try {
+        await apiRequest('/api/posts', {
+          method: 'POST',
+          body: JSON.stringify({
+            title: formData.get('title'),
+            body: formData.get('body'),
+          }),
+        });
+        form.reset();
+        showMessage(message, 'Post created.');
+      } catch (error) {
+        showMessage(message, error.message, true);
+      }
+    });
+
+    document.getElementById('lookup-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const message = document.getElementById('lookup-message');
+      const resultElement = document.getElementById('lookup-result');
+      const userId = new FormData(event.currentTarget).get('userId').trim();
+      resultElement.hidden = true;
+      showMessage(message, 'Loading user posts...');
+
+      try {
+        const result = await apiRequest(`/api/admin/users/${encodeURIComponent(userId)}/posts`);
+        resultElement.textContent = JSON.stringify(result.data, null, 2);
+        resultElement.hidden = false;
+        showMessage(message, '');
+      } catch (error) {
+        showMessage(message, error.message, true);
+      }
+    });
+
+    updateAuthUI();
+    if (token) {
+      loadNotes();
+    }
+  </script>
+</body>
+</html>
