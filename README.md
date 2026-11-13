@@ -8,41 +8,38 @@ This project implements robust authentication, role-based access control (RBAC),
 ---
 
 ## Live Demo & Links
-* **Live Backend & Frontend URL:** [https://nodejs-backend-noteapp-crud.vercel.app](https://nodejs-backend-noteapp-crud.vercel.app)
-* **Backend Repository:** [GitHub Repository](https://github.com/devkamalhossen/nodejs-backend-noteapp-crud)
+* Live Backend & Frontend URL: [https://nodejs-backend-noteapp-crud.vercel.app](https://nodejs-backend-noteapp-crud.vercel.app)
+* Backend Repository: [GitHub Repository](https://github.com/devkamalhossen/nodejs-backend-noteapp-crud)
 
----
 
 ## Tech Stack
-* **Backend:** Node.js, Express.js
-* **Database:** MongoDB, Mongoose (with Schema Indexing & Aggregation Pipelines)
-* **Authentication:** JSON Web Tokens (JWT), Secure Password Hashing (bcrypt)
-* **Frontend:** Vanilla HTML5, CSS3, JavaScript (Fetch API, SPA architecture)
-* **Deployment:** Vercel
+* Backend: Node.js, Express.js
+* Database: MongoDB, Mongoose (with Schema Indexing & Aggregation Pipelines)
+* Authentication: JSON Web Tokens (JWT), Secure Password Hashing (bcrypt)
+* Frontend: Vanilla HTML5, CSS3, JavaScript (Fetch API, SPA architecture)
+* Deployment: Vercel
 
----
 
 ## Features & Implementation Details
 
 ### 1. Roles & Permissions
-* **User:** 
+* User: 
   * Can securely register, log in, and manage (Create, Read, Update, Delete) their own personal notes.
   * Can create posts visible to everyone.
-* **Admin:** 
+* Admin: 
   * Inherits all User capabilities.
   * Can manage users (add, remove, update, and list all users).
   * Can view everyone's notes and perform advanced administrative queries.
 
 ### 2. Database Indexing & Optimization
-* **Schema Indexing:** Implemented `schema.index()` explicitly in Mongoose models to optimize query performance for list operations and GET requests without making unnecessary indexes.
-* **Aggregation Task 1 (Group by Interests):** Utilizes a single `Collection.aggregate()` pipeline to group users based on their specific interests.
-* **Aggregation Task 2 (User Posts `$lookup`):** Utilizes a single aggregation pipeline with a `$lookup` stage to retrieve all posts belonging to a specific user.
+* Schema Indexing: Implemented `schema.index()` explicitly in Mongoose models to optimize query performance for list operations and GET requests without making unnecessary indexes.
+* Aggregation Task 1 (Group by Interests): Utilizes a single `Collection.aggregate()` pipeline to group users based on their specific interests.
+* Aggregation Task 2 (User Posts `$lookup`): Utilizes a single aggregation pipeline with a `$lookup` stage to retrieve all posts belonging to a specific user.
 
 ### 3. Lightweight Frontend SPA
 * Built directly into a `public/` directory and served statically via Express (`express.static('public')`).
 * Features clean API integration using standard JavaScript `fetch()`, `localStorage`-based JWT token management, and dynamic DOM manipulation for notes, posts, and admin user/post lookups.
 
----
 
 ## ⚙️ Local Installation & Setup Guide
 
